@@ -208,6 +208,29 @@ __PACKAGE__->register_method ({
 		# test if user exists and is enabled
 		$rpcenv->check_user_enabled($username);
 	    }
+	    
+	    if ($rpcenv->check_user_exist($username, 1) &&
+                defined(my $groups = $info->{'groups'}) &&
+                ref($info->{'roles'}) eq 'ARRAY') {
+
+                     PVE::AccessControl::lock_user_config(sub {
+                         my $usercfg = cfs_read_file("user.cfg");
+
+                         foreach my $claimed_group (@$info->{'groups'}) {
+                                my $usercfg = cfs_read_file("user.cfg");
+
+                                if ($usercfg->{groups}->{$claimed_group}) {
+                                    PVE::AccessControl::add_user_group($username, $usercfg, $claimed_group);
+                                } else {
+                                    warn("openid: no such group '$claimed_group'");
+                                    next;
+                                }
+                          }
+
+                          cfs_write_file("user.cfg", $usercfg);
+                      }, "update user groups failed");
+                }
+            }
 
 	    my $ticket = PVE::AccessControl::assemble_ticket($username);
 	    my $csrftoken = PVE::AccessControl::assemble_csrf_prevention_token($username);
